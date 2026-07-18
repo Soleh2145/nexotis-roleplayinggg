@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Undang-Undang - Kepolisian Nexotis</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="navbar-mount"></div>
+
+  <div class="container">
+    <div class="card">
+      <h2>Undang-Undang Internal</h2>
+      <div class="sub">Contoh isi halaman aturan. Ganti teks di bawah sesuai aturan server kamu sendiri.</div>
+
+      <div class="law-block">
+        <h3>Bab I — Ketentuan Absensi</h3>
+        <ol>
+          <li>Anggota wajib melapor hadir setiap sesi duty disertai bukti foto.</li>
+          <li>Keterlambatan lapor lebih dari 1 hari dianggap alpa.</li>
+          <li>Laporan cuti wajib diajukan minimal 1 hari sebelum tanggal mulai.</li>
+        </ol>
+      </div>
+
+      <div class="law-block">
+        <h3>Bab II — Kode Etik</h3>
+        <ol>
+          <li>Anggota wajib bersikap profesional saat bertugas.</li>
+          <li>Dilarang menyalahgunakan wewenang untuk kepentingan pribadi.</li>
+          <li>Setiap pelanggaran akan ditindak sesuai tingkat divisi masing-masing.</li>
+        </ol>
+      </div>
+
+      <div class="law-block">
+        <h3>Bab III — Penggajian</h3>
+        <ol>
+          <li>Gaji dihitung berdasarkan akumulasi jam duty terverifikasi per minggu.</li>
+          <li>Laporan dengan status "ditolak" tidak dihitung dalam estimasi gaji.</li>
+          <li>High Command dapat mereset periode duty lewat Panel Rekap saat pergantian minggu gaji.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+<script>
+  (async function init() {
+    const user = await requireAuth();
+    if (user) renderNavbar("uu", user);
+  })();
+</script>
+</body>
+</html>

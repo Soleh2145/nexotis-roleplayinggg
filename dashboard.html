@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - Kepolisian Nexotis</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="navbar-mount"></div>
+
+  <div class="container">
+    <div class="card">
+      <h2 id="greeting">Memuat...</h2>
+      <div class="sub" id="rank-div">Pangkat | Divisi</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card money">
+        <div class="label">Estimasi Gaji Minggu Ini</div>
+        <div class="value" id="stat-gaji">$0</div>
+      </div>
+      <div class="stat-card hours">
+        <div class="label">Total Akumulasi Jam Kerja</div>
+        <div class="value" id="stat-jam">0.00 Jam</div>
+      </div>
+    </div>
+
+    <div class="pill-row">
+      <div class="pill hadir"><div class="num" id="pill-hadir">0</div><div class="lbl">Hadir</div></div>
+      <div class="pill izin"><div class="num" id="pill-izin">0</div><div class="lbl">Izin</div></div>
+      <div class="pill cuti"><div class="num" id="pill-cuti">0</div><div class="lbl">Cuti</div></div>
+      <div class="pill alpa"><div class="num" id="pill-alpa">0</div><div class="lbl">Alpa</div></div>
+    </div>
+
+    <div class="card">
+      <h2>📋 Riwayat Absensi Minggu Ini</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Tanggal</th><th>Tipe</th><th>Waktu Duty</th><th>Status</th><th>Keterangan</th><th>Bukti</th></tr>
+          </thead>
+          <tbody id="riwayat-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Kirim Laporan Resmi</h2>
+      <div class="sub">Laporan akan berstatus "pending" sampai diverifikasi High Command.</div>
+
+      <div class="form-group">
+        <label>Status Kehadiran</label>
+        <div class="radio-group" id="tipe-group">
+          <label class="radio-option selected" data-tipe="hadir"><input type="radio" name="tipe" value="hadir" checked> HADIR (ON DUTY)</label>
+          <label class="radio-option" data-tipe="izin"><input type="radio" name="tipe" value="izin"> IZIN (HALANGAN)</label>
+          <label class="radio-option" data-tipe="cuti"><input type="radio" name="tipe" value="cuti"> CUTI (RENTANG WAKTU)</label>
+        </div>
+      </div>
+
+      <div class="form-group" id="field-tanggal">
+        <label for="tanggal">Tanggal</label>
+        <input type="date" id="tanggal">
+      </div>
+
+      <div class="form-group form-row" id="field-cuti" style="display:none">
+        <div><label for="cuti-mulai">Periode cuti mulai</label><input type="date" id="cuti-mulai"></div>
+        <div><label for="cuti-selesai">Periode cuti berakhir</label><input type="date" id="cuti-selesai"></div>
+      </div>
+
+      <div class="form-group form-row" id="field-duty">
+        <div><label for="waktu-mulai">Waktu duty mulai</label><input type="time" id="waktu-mulai" value="08:00"></div>
+        <div><label for="waktu-selesai">Waktu duty selesai</label><input type="time" id="waktu-selesai" value="16:00"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="foto">Bukti foto (screenshot in-game) *wajib untuk hadir</label>
+        <input type="file" id="foto" accept="image/*">
+        <img id="foto-preview" class="img-preview">
+      </div>
+
+      <div class="form-group">
+        <label for="keterangan">Kegiatan / alasan</label>
+        <textarea id="keterangan" placeholder="Contoh: patroli malam di area kota"></textarea>
+      </div>
+
+      <div class="error-msg" id="form-error"></div>
+      <button class="btn btn-primary" id="submit-btn">Kirim Laporan Resmi</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="foto-modal">
+    <div class="modal-box"><img id="modal-img" src=""><button class="btn btn-secondary" id="modal-close">Tutup</button></div>
+  </div>
+
+<script src="app.js"></script>
+<script>
+  let user, myRecords = [];
+
+  (async function init() {
+    user = await requireAuth();
+    if (!user) return;
+    renderNavbar("dashboard", user);
+    document.getElementById("greeting").textContent = `Halo, ${user.username}`;
+    document.getElementById("rank-div").textContent = user.pangkat;
+    document.getElementById("tanggal").value = toISO(new Date());
+    await refreshAll();
+  })();
+
+  async function refreshAll() {
+    const data = await api("/api/absensi");
+    myRecords = data.absensi;
+    refreshStats();
+    refreshRiwayat();
+  }
+
+  function refreshStats() {
+    const s = calcStatsFromRecords(myRecords, user.rate);
+    document.getElementById("stat-gaji").textContent = formatMoney(s.gaji);
+    document.getElementById("stat-jam").textContent = s.totalJam.toFixed(2) + " Jam";
+    document.getElementById("pill-hadir").textContent = s.hadir;
+    document.getElementById("pill-izin").textContent = s.izin;
+    document.getElementById("pill-cuti").textContent = s.cuti;
+    document.getElementById("pill-alpa").textContent = s.alpa;
+  }
+
+  function refreshRiwayat() {
+    const week = getWeekDates();
+    const rows = myRecords
+      .filter((a) => week.includes(a.tanggal) || (a.tipe === "cuti" && eachDateInRange(a.cutiMulai, a.cutiSelesai).some((d) => week.includes(d))))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const tbody = document.getElementById("riwayat-body");
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty">Belum ada laporan minggu ini.</td></tr>`; return; }
+    tbody.innerHTML = rows.map((a) => {
+      const waktu = a.tipe === "hadir" ? `${a.waktuMulai || "-"} - ${a.waktuSelesai || "-"}`
+        : a.tipe === "cuti" ? `${formatTanggal(a.cutiMulai)} s/d ${formatTanggal(a.cutiSelesai)}` : "-";
+      const foto = a.foto ? `<button class="btn-link" onclick="showFoto('${a.id}')">Lihat</button>` : "-";
+      return `<tr>
+        <td>${formatTanggal(a.tanggal)}</td>
+        <td style="text-transform:capitalize">${a.tipe}</td>
+        <td>${waktu}</td>
+        <td><span class="badge ${a.status}">${a.status}</span></td>
+        <td>${a.keterangan || "-"}</td>
+        <td>${foto}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  function showFoto(id) {
+    const rec = myRecords.find((a) => a.id === id);
+    if (!rec || !rec.foto) return;
+    document.getElementById("modal-img").src = rec.foto;
+    document.getElementById("foto-modal").classList.add("open");
+  }
+  document.getElementById("modal-close").addEventListener("click", () => document.getElementById("foto-modal").classList.remove("open"));
+
+  document.querySelectorAll("#tipe-group .radio-option").forEach((label) => {
+    label.addEventListener("click", () => {
+      document.querySelectorAll("#tipe-group .radio-option").forEach((l) => l.classList.remove("selected"));
+      label.classList.add("selected");
+      label.querySelector("input").checked = true;
+      const tipe = label.dataset.tipe;
+      document.getElementById("field-cuti").style.display = tipe === "cuti" ? "flex" : "none";
+      document.getElementById("field-duty").style.display = tipe === "hadir" ? "flex" : "none";
+      document.getElementById("field-tanggal").style.display = tipe === "cuti" ? "none" : "block";
+    });
+  });
+
+  let fotoDataUrl = null;
+  document.getElementById("foto").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) { fotoDataUrl = null; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      fotoDataUrl = reader.result;
+      const img = document.getElementById("foto-preview");
+      img.src = fotoDataUrl;
+      img.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById("submit-btn").addEventListener("click", async () => {
+    const tipe = document.querySelector('input[name="tipe"]:checked').value;
+    const errorEl = document.getElementById("form-error");
+    errorEl.textContent = "";
+
+    if (tipe === "hadir" && !fotoDataUrl) { errorEl.textContent = "Bukti foto wajib diisi untuk laporan hadir."; return; }
+    if (tipe === "cuti" && (!document.getElementById("cuti-mulai").value || !document.getElementById("cuti-selesai").value)) {
+      errorEl.textContent = "Periode cuti wajib diisi."; return;
+    }
+
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true; btn.textContent = "Mengirim...";
+    try {
+      await api("/api/absensi", { method: "POST", body: JSON.stringify({
+        tipe,
+        tanggal: document.getElementById("tanggal").value,
+        waktuMulai: tipe === "hadir" ? document.getElementById("waktu-mulai").value : null,
+        waktuSelesai: tipe === "hadir" ? document.getElementById("waktu-selesai").value : null,
+        cutiMulai: tipe === "cuti" ? document.getElementById("cuti-mulai").value : null,
+        cutiSelesai: tipe === "cuti" ? document.getElementById("cuti-selesai").value : null,
+        foto: fotoDataUrl,
+        keterangan: document.getElementById("keterangan").value,
+      })});
+      document.getElementById("keterangan").value = "";
+      document.getElementById("foto").value = "";
+      document.getElementById("foto-preview").style.display = "none";
+      fotoDataUrl = null;
+      await refreshAll();
+    } catch (e) {
+      errorEl.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Kirim Laporan Resmi";
+    }
+  });
+</script>
+</body>
+</html>

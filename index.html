@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kepolisian Nexotis - Login</title>
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --discord: #5865F2;
+            --success: #10b981;
+        }
+        body { display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card2 {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border-top: 5px solid var(--red);
+            max-width: 400px;
+            width: 90%;
+            animation: fadeSlideUp 0.5s ease both;
+        }
+        .login-card2 h1 { margin-bottom: 10px; letter-spacing: 2px; font-size: 1.6em; color: var(--red-light); }
+        .login-card2 p { color: var(--muted); margin-bottom: 30px; font-size: 0.85em; line-height: 1.6; }
+        .btn-discord {
+            background: var(--discord);
+            color: white;
+            padding: 15px 20px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.2s;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-discord:hover { background: #4752c4; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(88,101,242,0.4); }
+        .btn-discord:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-install {
+            background: var(--success);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: 0.2s;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-install:hover { background: #059669; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16,185,129,0.4); }
+        .footer2 { margin-top: 22px; font-size: 0.72em; color: var(--faint); }
+    </style>
+</head>
+<body>
+    <div class="login-card2">
+        <div style="font-size: 56px; margin-bottom: 8px;">🚔</div>
+        <h1>KEPOLISIAN NEXOTIS</h1>
+        <p>Gunakan akun Discord kamu untuk memverifikasi identitas, pangkat, dan akses panel anggota. Pangkat &amp; status High Command dibaca otomatis dari role Discord.</p>
+
+        <button id="btnDiscord" class="btn-discord" disabled>
+            <img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="20" style="filter:brightness(0) invert(1)">
+            Memuat...
+        </button>
+        <button id="btnInstall" class="btn-install">📥 Download Aplikasi Nexotis</button>
+
+        <div class="error-msg" id="error-msg"></div>
+        <div class="footer2">&copy; 2026 Kepolisian Nexotis</div>
+    </div>
+
+<script src="app.js"></script>
+<script>
+    // Kalau error dilempar balik dari /api/auth-callback
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error")) document.getElementById("error-msg").textContent = params.get("error");
+
+    // Kalau sesi masih aktif, langsung ke dashboard
+    (async () => {
+        try {
+            await api("/api/me");
+            window.location.href = "dashboard.html";
+        } catch (e) { /* belum login, tetap di sini */ }
+    })();
+
+    // Ambil URL "Login with Discord" dari server (client_id dibentuk di sana)
+    (async () => {
+        const btn = document.getElementById("btnDiscord");
+        try {
+            const { url } = await api("/api/oauth-url");
+            btn.disabled = false;
+            btn.innerHTML = `<img src="https://cdn-icons-png.flaticon.com/512/2111/2111370.png" width="20" style="filter:brightness(0) invert(1)"> Login with Discord`;
+            btn.addEventListener("click", () => { window.location.href = url; });
+        } catch (e) {
+            btn.textContent = "Server tidak merespons";
+        }
+    })();
+
+    // ====== PWA install ======
+    let deferredPrompt;
+    const btnInstall = document.getElementById('btnInstall');
+    window.addEventListener('load', () => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Kepolisian Nexotis siap dipasang!', reg.scope))
+                .catch(err => console.log('Gagal mendaftarkan service worker', err));
+        }
+    });
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (btnInstall) btnInstall.style.display = 'flex';
+    });
+    if (btnInstall) {
+        btnInstall.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User memilih untuk: ${outcome}`);
+            deferredPrompt = null;
+            btnInstall.style.display = 'none';
+        });
+    }
+    window.addEventListener('appinstalled', () => {
+        console.log('Kepolisian Nexotis sukses terpasang!');
+        if (btnInstall) btnInstall.style.display = 'none';
+    });
+</script>
+</body>
+</html>
